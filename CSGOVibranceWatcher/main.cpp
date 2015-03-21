@@ -20,8 +20,14 @@ bool ForegroundWindowIsCSGO()
 		HMODULE hMod;
 		DWORD cbNeeded;
 
+		TCHAR ExpectedProcess[] = _T("cmd.exe");
+
 		if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded))
 			GetModuleBaseName(hProcess, hMod, ProcessExeName, sizeof(ProcessExeName) / sizeof(TCHAR));
+
+		if (_tcscmp(ProcessExeName, ExpectedProcess) == 0)
+			printf("It worked!");
+
 		_tprintf(TEXT("%s  (PID: %u)\n"), ProcessExeName, procID);
 
 		CloseHandle(hProcess);

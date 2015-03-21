@@ -6,15 +6,14 @@
 #include "adl_sdk.h"
 #include "adl_structures.h"
 
-void TryFindCSGOHandle()
+bool ForegroundWindowIsCSGO()
 {
-	HWND foregroundWindowHandle = GetForegroundWindow();
-	LPDWORD procID = 0;
-	DWORD processID = GetWindowThreadProcessId(foregroundWindowHandle, procID);
-	DWORD chrome = 6516;
-	TCHAR szProcessName[MAX_PATH] = TEXT("<unknown>");
+	HWND handle = GetForegroundWindow();
+	DWORD procID = 0;
+	GetWindowThreadProcessId(handle, &procID);
 
-	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, chrome);
+	TCHAR ProcessExeName[MAX_PATH] = TEXT("<unknown>");
+	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, procID);
 
 	if (hProcess != NULL)
 	{
@@ -22,18 +21,21 @@ void TryFindCSGOHandle()
 		DWORD cbNeeded;
 
 		if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded))
-			GetModuleBaseName(hProcess, hMod, szProcessName, sizeof(szProcessName) / sizeof(TCHAR));
-
-		_tprintf(TEXT("%s  (PID: %u)\n"), szProcessName, processID);
+			GetModuleBaseName(hProcess, hMod, ProcessExeName, sizeof(ProcessExeName) / sizeof(TCHAR));
+		_tprintf(TEXT("%s  (PID: %u)\n"), ProcessExeName, procID);
 
 		CloseHandle(hProcess);
+		return true;
 	}
 	else
+	{
 		printf("Failed!\n");
+		return false;
+	}
 }
 
 void main(void)
 {
-	TryFindCSGOHandle();
+	ForegroundWindowIsCSGO();
 }
 

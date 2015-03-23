@@ -6,6 +6,9 @@
 #include "adl_sdk.h"
 #include "adl_structures.h"
 
+static bool ProcessDebugLogging = true;
+static bool DisplayDeviceDebugLogging = true;
+
 bool ForegroundWindowIsCSGO()
 {
 	// Get foreground window and the process ID of that window.
@@ -33,22 +36,39 @@ bool ForegroundWindowIsCSGO()
 
 		// Is it the process we were looking for?
 		if (_tcscmp(ProcessExeName, ExpectedProcess) == 0)
-			printf("Ideal process found - ");
+			if (ProcessDebugLogging)
+				printf("Ideal process found - ");
 
-		_tprintf(TEXT("%s  (PID: %u)\n"), ProcessExeName, procID);
+		if (ProcessDebugLogging)
+			_tprintf(TEXT("%s  (PID: %u)\n"), ProcessExeName, procID);
 
 		CloseHandle(hProcess);
 		return true;
 	}
 	else
 	{
-		printf("Can't get process.\n");
+		if (ProcessDebugLogging)
+			printf("Can't get process.\n");
 		return false;
+	}
+}
+
+void GetDisplayDevice()
+{
+	int iDevNum = 0;
+	DISPLAY_DEVICEA displayDevice = {};
+	displayDevice.cb = sizeof(DISPLAY_DEVICEA);
+	while (EnumDisplayDevicesA(NULL, iDevNum, &displayDevice, EDD_GET_DEVICE_INTERFACE_NAME))
+	{
+		if (DisplayDeviceDebugLogging)
+			printf("%s\n", displayDevice.DeviceString);
+		iDevNum++;
 	}
 }
 
 void main(void)
 {
+	GetDisplayDevice();
 	while (true)
 	{
 		if (ForegroundWindowIsCSGO())

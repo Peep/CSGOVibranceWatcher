@@ -6,6 +6,10 @@
 #include "adl_sdk.h"
 #include "adl_structures.h"
 
+#define AMD 0
+#define NVIDIA 1
+
+static int DisplayVendor;
 static bool ProcessDebugLogging = true;
 static bool DisplayDeviceDebugLogging = true;
 
@@ -60,6 +64,21 @@ void GetDisplayDevice()
 	displayDevice.cb = sizeof(DISPLAY_DEVICEA);
 	while (EnumDisplayDevicesA(NULL, iDevNum, &displayDevice, EDD_GET_DEVICE_INTERFACE_NAME))
 	{
+		if (strstr(displayDevice.DeviceString, "AMD") != NULL)
+		{
+			if (DisplayDeviceDebugLogging)
+				printf("AMD card found!\n");
+			DisplayVendor = AMD;
+			break;
+		}
+		if (strstr(displayDevice.DeviceString, "NVIDIA") != NULL)
+		{
+			if (DisplayDeviceDebugLogging)
+				printf("NVIDIA card found!\n");
+			DisplayVendor = NVIDIA;
+			break;
+		}
+
 		if (DisplayDeviceDebugLogging)
 			printf("%s\n", displayDevice.DeviceString);
 		iDevNum++;

@@ -81,9 +81,9 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\ADL\ADL\adl_defines.h" />
-    <ClInclude Include="..\..\ADL\ADL\adl_sdk.h" />
-    <ClInclude Include="..\..\ADL\ADL\adl_structures.h" />
+    <ClInclude Include="adl_defines.h" />
+    <ClInclude Include="adl_sdk.h" />
+    <ClInclude Include="adl_structures.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

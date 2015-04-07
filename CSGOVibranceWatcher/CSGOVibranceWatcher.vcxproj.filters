@@ -20,13 +20,13 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\ADL\ADL\adl_structures.h">
+    <ClInclude Include="adl_defines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\ADL\ADL\adl_defines.h">
+    <ClInclude Include="adl_sdk.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\ADL\ADL\adl_sdk.h">
+    <ClInclude Include="adl_structures.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

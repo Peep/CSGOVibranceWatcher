@@ -161,7 +161,17 @@ int main(void)
 
 		printf("Primary display is %d\n", primary);
 
-		printf("Current saturation for the primary monitor: %d\n", GetCurrentSaturation(primary));
+		int displayCount;
+		ADLDisplayInfo *displayInfo = NULL;
+
+		ADL_Display_DisplayInfo_Get(primary, &displayCount, &displayInfo, 0);
+		int dpyIndex = displayInfo[0].displayID.iDisplayLogicalIndex;
+
+		int cur, def, min, max, step;
+		if (ADL_OK == ADL_Display_Color_Get(primary, dpyIndex, ADL_DISPLAY_COLOR_SATURATION, &cur, &def, &min, &max, &step))
+			printf("Current saturation for the primary monitor: %d\n", cur);
+
+		ADL_Display_Color_Set(primary, dpyIndex, ADL_DISPLAY_COLOR_SATURATION, 100);
 	}
 
 	//while (true)

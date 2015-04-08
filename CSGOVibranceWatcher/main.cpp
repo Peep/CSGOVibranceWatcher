@@ -58,7 +58,7 @@ bool ForegroundWindowIsCSGO()
 		DWORD cbNeeded;
 
 		// The name of the executable we're hoping to find.
-		TCHAR ExpectedProcess[] = _T("cmd.exe");
+		TCHAR ExpectedProcess[] = _T("csgo.exe");
 
 		// Enumerable the modules of the process and grab the executable name.
 		if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded))
@@ -66,14 +66,18 @@ bool ForegroundWindowIsCSGO()
 
 		// Is it the process we were looking for?
 		if (_tcscmp(ProcessExeName, ExpectedProcess) == 0)
-			if (ProcessDebugLogging)
-				printf("Ideal process found - ");
+		{
+			return true;
+			CloseHandle(hProcess);
+		}
+		else
+		{
+			return false;
+			CloseHandle(hProcess);
+		}
 
 		if (ProcessDebugLogging)
 			_tprintf(TEXT("%s  (PID: %u)\n"), ProcessExeName, procID);
-
-		CloseHandle(hProcess);
-		return true;
 	}
 	else
 	{
@@ -111,11 +115,23 @@ void GetDisplayDevice()
 	}
 }
 
+int GetPrimaryDisplayIndex()
+{
+	int primary;
+	ADL_Adapter_Primary_Get(&primary);
+	int displayCount;
+	ADLDisplayInfo *displayInfo = NULL;
+
+	ADL_Display_DisplayInfo_Get(primary, &displayCount, &displayInfo, 0);
+	return displayInfo[0].displayID.iDisplayLogicalIndex;
+}
+
 int GetCurrentSaturation(int displayNum)
 {
-	int cur, def, min, max, step;
-	if (ADL_OK == ADL_Display_Color_Get(displayNum, 0, ADL_DISPLAY_COLOR_SATURATION, &cur, &def, &min, &max, &step))
-		return cur;
+	int curSat, def, minSat, maxSat, step;
+	ADL_Display_Color_Get(displayNum, GetPrimaryDisplayIndex(), 
+		ADL_DISPLAY_COLOR_SATURATION, &curSat, &def, &minSat, &maxSat, &step);
+	return curSat;
 }
 
 int main(void)
@@ -153,34 +169,31 @@ int main(void)
 		}
 
 		int primary;
-		if (ADL_Adapter_Primary_Get(&primary) != ADL_OK)
-		{
-			printf("Couldn't retrieve primary display!\n");
-			return 1;
-		}
+		ADL_Adapter_Primary_Get(&primary);
 
 		printf("Primary display is %d\n", primary);
 
-		int displayCount;
-		ADLDisplayInfo *displayInfo = NULL;
+		ADL_Display_Color_Set(primary, GetPrimaryDisplayIndex(), ADL_DISPLAY_COLOR_SATURATION, 100);
 
-		ADL_Display_DisplayInfo_Get(primary, &displayCount, &displayInfo, 0);
-		int dpyIndex = displayInfo[0].displayID.iDisplayLogicalIndex;
-
-		int cur, def, min, max, step;
-		if (ADL_OK == ADL_Display_Color_Get(primary, dpyIndex, ADL_DISPLAY_COLOR_SATURATION, &cur, &def, &min, &max, &step))
-			printf("Current saturation for the primary monitor: %d\n", cur);
-
-		ADL_Display_Color_Set(primary, dpyIndex, ADL_DISPLAY_COLOR_SATURATION, 100);
+		while (true)
+		{
+			if (ForegroundWindowIsCSGO())
+			{
+				if (DisplayVendor == AMD)
+				{
+					ADL_Display_Color_Set(primary, GetPrimaryDisplayIndex(), ADL_DISPLAY_COLOR_SATURATION, 200);
+				}
+			}
+			else
+			{
+				ADL_Display_Color_Set(primary, GetPrimaryDisplayIndex(), ADL_DISPLAY_COLOR_SATURATION, 100);
+			}
+			Sleep(200);
+		}
 	}
-
-	//while (true)
-	//{
-	//	if (ForegroundWindowIsCSGO())
-	//	{
-	//		// do stuff
-	//	}
-	//	Sleep(200);
-	//}
+	else if (DisplayVendor == NVIDIA)
+	{
+		// TODO
+	}
 }
 

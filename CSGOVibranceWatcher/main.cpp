@@ -1,15 +1,11 @@
 #include <windows.h>
 #include <stdio.h>
+#include <iostream>
 #include <tchar.h>
 #include <psapi.h>
-#include <string>
-#include <vector>
-#include <iostream>
 #include "adl_defines.h"
 #include "adl_sdk.h"
 #include "adl_structures.h"
-
-using namespace std;
 
 #define AMD 0
 #define NVIDIA 1
@@ -28,139 +24,134 @@ ADL_DISPLAY_COLOR_GET			 ADL_Display_Color_Get;
 ADL_DISPLAY_COLOR_SET			 ADL_Display_Color_Set;
 ADL_DISPLAY_DISPLAYINFO_GET		 ADL_Display_DisplayInfo_Get;
 
-static int DisplayVendor;
-static bool ProcessDebugLogging = true;
-static bool DisplayDeviceDebugLogging = true;
+static int PrimaryDisplay = 0;
+static int DisplayVendor = 0;
+static bool ProcessDebugLogging = false;
+static bool DisplayDeviceDebugLogging = false;
+static int LastSaturation = 0;
+static int PrimaryDisplayIndex = 0;
 
-// Memory allocation function
 void* __stdcall ADL_Main_Memory_Alloc(int iSize)
 {
-	void* lpBuffer = malloc(iSize);
+	auto lpBuffer = malloc(iSize);
 	return lpBuffer;
 }
 
 bool ForegroundWindowIsCSGO()
 {
-	// Get foreground window and the process ID of that window.
-	HWND handle = GetForegroundWindow();
+	auto handle = GetForegroundWindow();
 	DWORD procID = 0;
 	GetWindowThreadProcessId(handle, &procID);
 
 	TCHAR ProcessExeName[MAX_PATH] = TEXT("Can't get executable name.");
-	// Open the process so we can query information from it.
-	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, procID);
+	auto hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, procID);
 
-	// We'll get something with most programs, however explorer windows don't seem
-	// to return explorer.exe as the executable name. This shouldn't matter for our purposes.
-	if (hProcess != NULL)
+	if (hProcess != nullptr)
 	{
 		HMODULE hMod;
 		DWORD cbNeeded;
 
-		// The name of the executable we're hoping to find.
 		TCHAR ExpectedProcess[] = _T("csgo.exe");
 
-		// Enumerable the modules of the process and grab the executable name.
 		if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded))
 			GetModuleBaseName(hProcess, hMod, ProcessExeName, sizeof(ProcessExeName) / sizeof(TCHAR));
 
-		// Is it the process we were looking for?
 		if (_tcscmp(ProcessExeName, ExpectedProcess) == 0)
 		{
+			CloseHandle(hProcess);
 			return true;
-			CloseHandle(hProcess);
 		}
-		else
-		{
-			return false;
-			CloseHandle(hProcess);
-		}
-
-		if (ProcessDebugLogging)
-			_tprintf(TEXT("%s  (PID: %u)\n"), ProcessExeName, procID);
-	}
-	else
-	{
-		if (ProcessDebugLogging)
-			printf("Can't get process.\n");
+		CloseHandle(hProcess);
 		return false;
 	}
+	return false;
 }
 
 void GetDisplayDevice()
 {
-	int iDevNum = 0;
+	auto device = 0;
 	DISPLAY_DEVICEA displayDevice = {};
 	displayDevice.cb = sizeof(DISPLAY_DEVICEA);
-	while (EnumDisplayDevicesA(NULL, iDevNum, &displayDevice, EDD_GET_DEVICE_INTERFACE_NAME))
+
+	while (EnumDisplayDevicesA(nullptr, device, &displayDevice, EDD_GET_DEVICE_INTERFACE_NAME))
 	{
-		if (strstr(displayDevice.DeviceString, "AMD") != NULL)
+		if (strstr(displayDevice.DeviceString, "AMD") != nullptr)
 		{
-			if (DisplayDeviceDebugLogging)
-				printf("AMD card found!\n");
 			DisplayVendor = AMD;
 			break;
 		}
-		if (strstr(displayDevice.DeviceString, "NVIDIA") != NULL)
+		if (strstr(displayDevice.DeviceString, "NVIDIA") != nullptr)
 		{
-			if (DisplayDeviceDebugLogging)
-				printf("NVIDIA card found!\n");
 			DisplayVendor = NVIDIA;
 			break;
 		}
-
-		if (DisplayDeviceDebugLogging)
-			printf("%s\n", displayDevice.DeviceString);
-		iDevNum++;
+		device++;
 	}
 }
 
-int GetPrimaryDisplayIndex()
-{
-	int primary;
-	ADL_Adapter_Primary_Get(&primary);
-	int displayCount;
-	ADLDisplayInfo *displayInfo = NULL;
-
-	ADL_Display_DisplayInfo_Get(primary, &displayCount, &displayInfo, 0);
-	return displayInfo[0].displayID.iDisplayLogicalIndex;
-}
-
-int GetCurrentSaturation(int displayNum)
+int GetCurrentSaturation()
 {
 	int curSat, def, minSat, maxSat, step;
-	ADL_Display_Color_Get(displayNum, GetPrimaryDisplayIndex(), 
+	ADL_Display_Color_Get(PrimaryDisplay, PrimaryDisplayIndex, 
 		ADL_DISPLAY_COLOR_SATURATION, &curSat, &def, &minSat, &maxSat, &step);
 	return curSat;
 }
 
-int main(void)
+void SetSaturationFade(int saturation)
+{
+	if (saturation != LastSaturation)
+	{
+		LastSaturation = saturation;
+		auto currentSaturation = GetCurrentSaturation();
+
+		if (DisplayVendor == AMD)
+		{
+			std::cout << "Fading saturation from " << currentSaturation 
+				<< " to " << saturation << std::endl;
+			if (currentSaturation > saturation)
+			{
+				for (auto i = currentSaturation; i >= saturation; i--)
+				{
+					ADL_Display_Color_Set(PrimaryDisplay, PrimaryDisplayIndex,
+						ADL_DISPLAY_COLOR_SATURATION, i);
+					Sleep(20);
+				}
+			}
+			else
+			{
+				for (auto i = currentSaturation; i <= saturation; i++)
+				{
+					ADL_Display_Color_Set(PrimaryDisplay, PrimaryDisplayIndex,
+						ADL_DISPLAY_COLOR_SATURATION, i);
+					Sleep(20);
+				}
+			}
+		}
+		std::cout << "Done. Saturation is now " << saturation << std::endl;
+	}
+}
+
+int main()
 {
 	GetDisplayDevice();
 	if (DisplayVendor == AMD)
 	{
-		HINSTANCE hDLL = LoadLibraryA("atiadlxx.dll");
-		if (hDLL == NULL) // try 32 bit dll
+		std::cout << "AMD card detected, using ADL.." << std::endl;
+		auto hDLL = LoadLibraryA("atiadlxx.dll");
+		if (hDLL == nullptr) // try 32 bit dll
 			hDLL = LoadLibraryA("atiadlxy.dll");
-		if (hDLL == NULL)
+		if (hDLL == nullptr)
 		{
 			printf("ADL library not found!\n"); 
-			return 0;
-		}
-
-		ADL_Display_Color_Get = (ADL_DISPLAY_COLOR_GET)GetProcAddress(hDLL, "ADL_Display_Color_Get");
-		ADL_Display_Color_Set = (ADL_DISPLAY_COLOR_SET)GetProcAddress(hDLL, "ADL_Display_Color_Set");
-		ADL_Adapter_Primary_Get = (ADL_ADAPTER_PRIMARY_GET)GetProcAddress(hDLL, "ADL_Adapter_Primary_Get");
-		ADL_Display_DisplayInfo_Get = (ADL_DISPLAY_DISPLAYINFO_GET)GetProcAddress(hDLL, "ADL_Display_DisplayInfo_Get");
-
-		if (NULL == ADL_Display_Color_Get || NULL == ADL_Display_Color_Set)
-		{
-			printf("ADL's API is missing!\n");
 			return 1;
 		}
 
-		ADL_Main_Control_Create = (ADL_MAIN_CONTROL_CREATE)GetProcAddress(hDLL, "ADL_Main_Control_Create");
-		ADL_Display_Color_Get = (ADL_DISPLAY_COLOR_GET)GetProcAddress(hDLL, "ADL_Display_Color_Get");
+		ADL_Display_Color_Get = ADL_DISPLAY_COLOR_GET(GetProcAddress(hDLL, "ADL_Display_Color_Get"));
+		ADL_Display_Color_Set = ADL_DISPLAY_COLOR_SET(GetProcAddress(hDLL, "ADL_Display_Color_Set"));
+		ADL_Adapter_Primary_Get = ADL_ADAPTER_PRIMARY_GET(GetProcAddress(hDLL, "ADL_Adapter_Primary_Get"));
+		ADL_Display_DisplayInfo_Get = ADL_DISPLAY_DISPLAYINFO_GET(GetProcAddress(hDLL, "ADL_Display_DisplayInfo_Get"));
+		ADL_Main_Control_Create = ADL_MAIN_CONTROL_CREATE(GetProcAddress(hDLL, "ADL_Main_Control_Create"));
+		ADL_Display_Color_Get = ADL_DISPLAY_COLOR_GET(GetProcAddress(hDLL, "ADL_Display_Color_Get"));
 
 		if (ADL_OK != ADL_Main_Control_Create(ADL_Main_Memory_Alloc, 1))
 		{
@@ -168,30 +159,28 @@ int main(void)
 			return 1;
 		}
 
+		ADL_Adapter_Primary_Get(&PrimaryDisplay);
+		LastSaturation = GetCurrentSaturation();
+
 		int primary;
 		ADL_Adapter_Primary_Get(&primary);
+		int displayCount;
+		ADLDisplayInfo *displayInfo = nullptr;
 
-		printf("Primary display is %d\n", primary);
-
-		ADL_Display_Color_Set(primary, GetPrimaryDisplayIndex(), ADL_DISPLAY_COLOR_SATURATION, 100);
+		ADL_Display_DisplayInfo_Get(primary, &displayCount, &displayInfo, 0);
+		PrimaryDisplayIndex = displayInfo[0].displayID.iDisplayLogicalIndex;
 
 		while (true)
 		{
 			if (ForegroundWindowIsCSGO())
-			{
-				if (DisplayVendor == AMD)
-				{
-					ADL_Display_Color_Set(primary, GetPrimaryDisplayIndex(), ADL_DISPLAY_COLOR_SATURATION, 200);
-				}
-			}
+				SetSaturationFade(130);
 			else
-			{
-				ADL_Display_Color_Set(primary, GetPrimaryDisplayIndex(), ADL_DISPLAY_COLOR_SATURATION, 100);
-			}
+				SetSaturationFade(100);
+
 			Sleep(200);
 		}
 	}
-	else if (DisplayVendor == NVIDIA)
+	if (DisplayVendor == NVIDIA)
 	{
 		// TODO
 	}

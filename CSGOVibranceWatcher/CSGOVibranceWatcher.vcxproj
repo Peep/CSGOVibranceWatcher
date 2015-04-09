@@ -78,12 +78,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="config.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="win32_amd.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="adl_defines.h" />
     <ClInclude Include="adl_sdk.h" />
     <ClInclude Include="adl_structures.h" />
+    <ClInclude Include="config.h" />
+    <ClInclude Include="main.h" />
+    <ClInclude Include="win32_amd.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
